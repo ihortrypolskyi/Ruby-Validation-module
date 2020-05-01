@@ -2,12 +2,12 @@ module Validation
   VALIDATION_TYPES = [:presence, :format, :instance_of]
 
   def self.included(klass)
-    klass.extend(ValidationClassMethods)
+    klass.extend(ClassMethods)
   end
 
-  module ValidationClassMethods
+  module ClassMethods
     @@parameters = {}
-    def validate(attr_name, options = {})
+    def validate(attr_name, **options)
       @@parameters[attr_name] = options
     end
 
@@ -16,29 +16,35 @@ module Validation
     end
 
     def parameters=(arg)
-      @@parameters=arg
+      @@parameters = arg
     end
   end
 
   def validate!
-    parameters = self.class.parameters
-    puts "PARAMETERS #{parameters}"
-    puts "ARGS #{@args}"
+    @parameters = self.class.parameters
 
-    parameters.each do |attr_name, options|
-      #rescue_exception { raise_attribute_error(attr_name) }
+    @parameters.each do |attr_name, options|
+      @attr_name = attr_name
+      @options = options
 
-      options.each do |type, rule|
-        rescue_exception do
-          case type
-          when :presence
-            validate_presence(attr_name, rule)
-          when :format
-           validate_format(attr_name, rule)
-          when :instance_of
-            validate_instance_of(attr_name, rule)
-          else
-            raise_type_error(attr_name, type)
+      rescue_exception do
+        raise_attribute_error
+
+        options.each do |type, rule|
+          @type = type
+          @rule = rule
+
+          rescue_exception do
+            case type
+            when :presence
+              validate_presence
+            when :format
+              validate_format
+            when :instance_of
+              validate_instance_of
+            else
+              raise_type_error
+            end
           end
         end
       end
@@ -48,38 +54,20 @@ module Validation
   end
 
   def valid?
-    validate!
-    return false if @errors.any?
-    true
+    validate! && @errors.any? ? false : true
   end
 
-  def validate_presence(attr_name, rule)
-    return unless rule
+  private
 
-    if @args[attr_name].nil? || @args[attr_name].empty?
-      raise "Validation failure: attribute :#{attr_name} can't be neither nil nor an empty string"
+  def raise_attribute_error
+    unless @args.include? @attr_name
+      raise "Attribute :#{@attr_name} for #{self} does not exist"
     end
   end
 
-  def validate_format(attr_name, rule)
-    raise "Validation failure: attribute :#{attr_name} should match #{rule}" unless @args[attr_name] =~ rule
-  end
-
-  def validate_instance_of(attr_name, rule)
-    unless @args[attr_name].instance_of? rule
-      raise "Validation failure: attribute :#{attr_name} should be an instance of #{rule}"
-    end
-  end
-
-  def raise_type_error(attr_name, type)
-    unless VALIDATION_TYPES.include? attr_name
-      raise "'#{type.capitalize}' is not acceptable validation type. Available types: #{VALIDATION_TYPES}"
-    end
-  end
-
-  def raise_attribute_error(attr_name)
-    unless @args[attr_name]
-      raise "Attribute :#{attr_name} for #{self} does not exist"
+  def raise_type_error
+    unless VALIDATION_TYPES.include? @type
+      raise "'#{@type.capitalize}' is not acceptable validation type. Available types: #{VALIDATION_TYPES}"
     end
   end
 
@@ -88,6 +76,24 @@ module Validation
       yield
     rescue RuntimeError => e
       @errors << e.message
+    end
+  end
+
+  def validate_instance_of
+    unless @args[@attr_name].instance_of?(@rule)
+      raise "Validation failure: attribute :#{@attr_name} should be an instance of #{@rule}"
+    end
+  end
+
+  def validate_format
+    raise "Validation failure: attribute :#{@attr_name} should match #{@rule}" unless @args[@attr_name] =~ @rule
+  end
+
+  def validate_presence
+    return unless @rule
+
+    if @args[@attr_name].nil? || @args[@attr_name].empty?
+      raise "Validation failure: attribute :#{@attr_name} can't be neither nil nor an empty string"
     end
   end
 end
