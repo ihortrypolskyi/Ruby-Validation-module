@@ -11,17 +11,17 @@ module Validation
       @@parameters[attr_name] = options
     end
 
-    def self.parameters
+    def parameters
       @@parameters
     end
 
-    def self.parameters=(arg)
+    def parameters=(arg)
       @@parameters=arg
     end
   end
 
   def validate!
-    parameters = Validation::ValidationClassMethods::parameters
+    parameters = self.class.parameters
     puts "PARAMETERS #{parameters}"
     puts "ARGS #{@args}"
 
@@ -43,7 +43,8 @@ module Validation
         end
       end
     end
-    Validation::ValidationClassMethods::parameters={}
+
+    self.class.parameters={}
   end
 
   def valid?
